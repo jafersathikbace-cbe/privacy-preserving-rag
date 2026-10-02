@@ -200,3 +200,46 @@ export class RagStore {
     return result;
   }
 
+  async retrieveAndVerify(query: string, sourceFilter = 'all'): Promise<{ chunks: string[]; sources: string[]; pages: string[]; verifiedItems: Candidate[] }> {
+    if (!this.isIndexReady || !this.transform || !this.allChunks.length) return { chunks: [], sources: [], pages: [], verifiedItems: [] };
+
+    const rawQuery = await embedQuery(query);
+    const maskedQuery = normalizeVector(applyTransform(rawQuery, this.transform.perm, this.transform.signs));
+    const lexical = this.lexicalScores(query, sourceFilter);
+    const lexicalMax = Math.max(1, ...Array.from(lexical.values()));
+    const searchable = sourceFilter && sourceFilter !== 'all' ? this.allChunks.filter((item) => item.source === sourceFilter) : this.allChunks;
+
+    const candidates: Candidate[] = searchable.map((item) => {
+      const semantic = dotProduct(item.vector, maskedQuery);
+      const lexicalRaw = lexical.get(item.globalIdx) || 0;
+      const lexicalNorm = lexicalRaw / lexicalMax;
+      const exact = query.trim().length > 3 && item.text.toLowerCase().includes(query.trim().toLowerCase()) ? 1 : 0;
+      const score = semantic * 0.70 + lexicalNorm * 0.25 + exact * 0.05;
+      return { ...item, score, semantic, lexical: lexicalNorm, exact };
+    });
+
+    candidates.sort((a, b) => b.score - a.score);
+    const verified: Candidate[] = [];
+    for (const candidate of candidates.slice(0, Math.min(40, candidates.length))) {
+      if (verifyMerkleProof(candidate.text, candidate.proof, candidate.rootHashHex)) verified.push(candidate);
+    }
+
+    // Diversity prevents one long document from monopolizing context when another source has the answer.
+    const selected: Candidate[] = [];
+    const perSource = new Map<string, number>();
+    for (const item of verified) {
+      const count = perSource.get(item.source) || 0;
+      if (count >= 3) continue;
+      selected.push(item);
+      perSource.set(item.source, count + 1);
+      if (selected.length >= MAX_CONTEXT_CHUNKS) break;
+    }
+
+    return {
+      chunks: selected.map((c) => c.text),
+      sources: selected.map((c) => c.source),
+      pages: selected.map((c) => c.pageStart === c.pageEnd ? `p. ${c.pageStart}` : `pp. ${c.pageStart}-${c.pageEnd}`),
+      verifiedItems: verified,
+    };
+  }
+
