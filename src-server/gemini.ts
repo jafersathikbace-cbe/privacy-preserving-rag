@@ -33,3 +33,24 @@ async function embedOne(ai: GoogleGenAI, text: string): Promise<Float32Array> {
   } catch (err) { console.warn('[Embedding] fallback:', (err as any)?.message || err); return fallbackEmbedding(text); }
 }
 
+export async function embedDocuments(texts: string[], concurrency = 6): Promise<Float32Array[]> {
+  const ai = getClient();
+  if (!ai) return texts.map((t) => fallbackEmbedding(t));
+  const output = new Array<Float32Array>(texts.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= texts.length) return;
+      output[i] = await embedOne(ai, texts[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, texts.length)) }, worker));
+  return output;
+}
+
+export async function embedQuery(text: string): Promise<Float32Array> {
+  const ai = getClient();
+  return ai ? embedOne(ai, text) : fallbackEmbedding(text);
+}
+
