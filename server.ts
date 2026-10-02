@@ -115,3 +115,11 @@ app.post('/chat', async (req, res) => {
   res.end();
 });
 
+app.get('/conversations', (_req, res) => res.json(ragStore.conversations.map((c) => ({ id: c.id, title: c.title, timestamp: c.timestamp, last_message: c.messages.at(-1)?.content?.slice(0, 80) || 'Empty session' }))));
+app.get('/conversation/:id', (req, res) => { const c = ragStore.conversations.find((x) => x.id === req.params.id); return c ? res.json(c) : res.status(404).json({ detail: 'Conversation not found' }); });
+app.post('/new_conversation', (_req, res) => { const c = { id: crypto.randomUUID(), title: 'New analysis', messages: [], timestamp: new Date().toISOString() }; ragStore.conversations.push(c); ragStore.saveConversations(); res.json({ id: c.id, title: c.title }); });
+app.delete('/delete_conversation/:id', (req, res) => { ragStore.conversations = ragStore.conversations.filter((c) => c.id !== req.params.id); ragStore.saveConversations(); res.json({ status: 'deleted' }); });
+app.post('/feedback', (req, res) => { if (!req.body?.query_id) return res.status(400).json({ detail: 'query_id required' }); ragStore.recordFeedback(req.body.query_id, Number(req.body.rating)); res.json({ status: 'feedback recorded' }); });
+app.delete('/clear', (_req, res) => { ragStore.conversations = []; ragStore.saveConversations(); res.json({ status: 'cleared' }); });
+
+// Multer errors (including the upload-size limit) are returned as JSON so the UI can explain them.
