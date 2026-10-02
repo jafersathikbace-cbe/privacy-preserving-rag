@@ -98,3 +98,44 @@ export default function App() {
     finally { setBusy(false); }
   };
 
+  const send = async () => {
+    const text = query.trim();
+    if (!text || busy || !stats.ready) return;
+    setQuery('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    setMessages((m) => [...m, { role: 'user', content: text }]);
+    setBusy(true);
+    const assistantIndex = messages.length + 1;
+    setMessages((m) => [...m, { role: 'assistant', content: '', verification: 'pending', citations: [] }]);
+    try {
+      const res = await fetch('/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, conversation_id: currentSession, source: sourceFilter }) });
+      if (!res.ok) throw new Error((await res.text()) || 'Request failed');
+      const reader = res.body?.getReader(); if (!reader) throw new Error('Streaming response unavailable');
+      const decoder = new TextDecoder(); let buffer = ''; let answer = ''; let citations: Citation[] = []; let verification = 'pending'; let queryId = '';
+      while (true) {
+        const { value, done } = await reader.read(); if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n'); buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            if (event.type === 'citations') citations = event.citations || [];
+            if (event.type === 'answer') { answer = event.content || ''; verification = event.verification || verification; }
+            if (event.type === 'done') { verification = event.verification || verification; queryId = event.query_id || queryId; }
+            setMessages((prev) => { const next = [...prev]; next[assistantIndex] = { role: 'assistant', content: answer, citations, verification, queryId }; return next; });
+          } catch { /* partial chunk */ }
+        }
+      }
+      await refresh();
+    } catch (err: any) {
+      setMessages((prev) => { const next = [...prev]; next[assistantIndex] = { role: 'assistant', content: err.message || 'The request failed.', verification: 'refused' }; return next; });
+    } finally { setBusy(false); }
+  };
+
+  const feedback = async (queryId: string | undefined, rating: number) => {
+    if (!queryId) return;
+    const res = await fetch('/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query_id: queryId, rating }) });
+    if (res.ok) notify(rating ? 'Feedback recorded' : 'Thanks — we will use that signal');
+  };
+
