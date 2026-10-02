@@ -176,3 +176,27 @@ export class RagStore {
       fs.writeFileSync(INDEX_STATE_FILE, JSON.stringify({ version: 2, documents: this.getUploadedFiles(), chunks: this.allChunks.length, updatedAt: new Date().toISOString() }));
     } catch {}
   }
+
+  private lexicalScores(query: string, sourceFilter = 'all'): Map<number, number> {
+    const qTokens = tokens(query);
+    const result = new Map<number, number>();
+    const corpus = sourceFilter && sourceFilter !== 'all' ? this.allChunks.filter((c) => c.source === sourceFilter) : this.allChunks;
+    if (!qTokens.length) return result;
+    const df = new Map<string, number>();
+    const docTokens = corpus.map((c) => new Set(tokens(c.text)));
+    for (const set of docTokens) for (const t of qTokens) if (set.has(t)) df.set(t, (df.get(t) || 0) + 1);
+    const n = corpus.length;
+    const qPhrase = qTokens.join(' ');
+    corpus.forEach((chunk) => {
+      const lower = chunk.text.toLowerCase();
+      let score = 0;
+      for (const t of qTokens) {
+        if (lower.includes(t)) score += Math.log((n + 1) / ((df.get(t) || 0) + 1)) + 1;
+      }
+      if (qPhrase.length > 3 && lower.includes(qPhrase)) score += 4;
+      if (qTokens.length > 1 && qTokens.every((t) => lower.includes(t))) score += 2;
+      if (score > 0) result.set(chunk.globalIdx, score);
+    });
+    return result;
+  }
+
