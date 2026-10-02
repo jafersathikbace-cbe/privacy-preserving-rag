@@ -139,3 +139,62 @@ export default function App() {
     if (res.ok) notify(rating ? 'Feedback recorded' : 'Thanks — we will use that signal');
   };
 
+  const copy = async (text: string) => { await navigator.clipboard?.writeText(text); notify('Answer copied'); };
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${sidebar ? 'open' : ''}`}>
+        <div className="brand">
+          <div className="brand-mark"><ShieldCheck size={20} /></div>
+          <div><div className="brand-name">NEXUS</div><div className="brand-sub">PRIVATE RAG PLATFORM</div></div>
+          <button className="icon-button mobile-only" onClick={() => setSidebar(false)}><X size={18} /></button>
+        </div>
+
+        <button className="new-session" onClick={newSession}><Plus size={16} /> New analysis</button>
+
+        <div className="sidebar-section session-section">
+          <div className="section-label"><span>Workspace</span><span>{sessions.length}</span></div>
+          <div className="session-list">
+            {sessions.length === 0 ? <div className="empty-small">Your analysis history will appear here.</div> : sessions.map((s) => (
+              <div key={s.id} className={`session-row ${currentSession === s.id ? 'active' : ''}`} onClick={() => openSession(s.id)}>
+                <MessageSquare size={14} />
+                <div className="session-copy"><div>{s.title}</div><span>{s.last_message}</span></div>
+                <button className="row-action" onClick={(e) => removeSession(s.id, e)}><Trash2 size={13} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="vault">
+          <div className="vault-heading"><div><div className="section-title"><FolderOpen size={15} /> Document vault</div><div className="muted">Private indexed sources</div></div><span className="count-pill">{files.length}</span></div>
+          <div className="source-filter" title="Choose which documents the next question can search">
+            <Search size={13} />
+            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+              <option value="all">Search all documents</option>
+              {files.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+          <div className="file-list">
+            {(sourceFilter === 'all' ? files : files.filter((f) => f === sourceFilter)).map((file) => (
+              <div className="file-row" key={file} title={file}>
+                <FileText size={14} /><span>{file}</span><button onClick={() => removeFile(file)} disabled={busy} title="Remove document"><Trash2 size={13} /></button>
+              </div>
+            ))}
+            {!files.length && <div className="empty-small">No documents yet. Add your first source below.</div>}
+          </div>
+          <button className="upload-button" onClick={() => fileRef.current?.click()} disabled={busy}><UploadCloud size={16} /><span>Add documents</span></button>
+          <input ref={fileRef} hidden type="file" multiple accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.bmp,.tiff" onChange={(e) => e.target.files && upload(e.target.files)} />
+          <div className="vault-status"><span><i className="status-dot" /> Integrity verified</span><span>{stats.chunks.toLocaleString()} chunks</span></div>
+        </div>
+      </aside>
+
+      {sidebar && <div className="mobile-overlay" onClick={() => setSidebar(false)} />}
+
+      <main className="main-panel">
+        <header className="topbar">
+          <div className="topbar-left"><button className="icon-button mobile-only" onClick={() => setSidebar(true)}><Menu size={20} /></button><div><div className="eyebrow">DOCUMENT INTELLIGENCE</div><div className="top-title">Private knowledge workspace</div></div></div>
+          <div className="top-actions"><div className="system-status"><i className="status-dot" /> System operational</div><button className="icon-button" onClick={refresh} title="Refresh"><RefreshCw size={17} /></button></div>
+        </header>
+
+        <section className="workspace">
+          {messages.length === 0 ? (
