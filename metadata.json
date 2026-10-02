@@ -1,0 +1,7 @@
+{
+  "name": "NEXUS Privacy-Preserving RAG",
+  "description": "Privacy-preserving document question-answering system with client-side embedding masking, Merkle integrity verification, and strict fail-closed Gemini grounding.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
