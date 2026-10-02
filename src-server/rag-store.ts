@@ -243,3 +243,14 @@ export class RagStore {
     };
   }
 
+  recordFeedback(queryId: string, rating: number) {
+    const meta = this.conversationMetadata.find((m) => m.query_id === queryId);
+    try {
+      if (!fs.existsSync(FEEDBACK_LOG)) fs.writeFileSync(FEEDBACK_LOG, 'timestamp,query_id,query,rating,verification\n');
+      const q = String(meta?.query || '').replace(/"/g, '""');
+      fs.appendFileSync(FEEDBACK_LOG, `"${new Date().toISOString()}","${queryId}","${q}","${rating}","${meta?.verification || ''}"\n`);
+    } catch (err) { console.error(err); }
+  }
+}
+
+export const ragStore = new RagStore();
