@@ -131,3 +131,18 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   return res.status(500).json({ detail: 'Unexpected server error.' });
 });
 
+async function startServer() {
+  try { await ragStore.loadOrBuildIndex(); } catch (err) { console.error('[Startup index]', err); }
+  const isDev = process.env.npm_lifecycle_event === 'dev' || process.env.NODE_ENV === 'development';
+  if (isDev) {
+    const { createServer } = await import('vite');
+    const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  }
+  app.listen(PORT, HOST, () => console.log(`[NEXUS] http://${HOST}:${PORT}`));
+}
+startServer().catch((err) => { console.error(err); process.exit(1); });
