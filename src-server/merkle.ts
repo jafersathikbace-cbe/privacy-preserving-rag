@@ -140,3 +140,32 @@ export function buildMerkleTree(leaves: string[]): {
   return { rootHash: globalRoot, rootHashHex: globalRoot.toString('hex'), proofs };
 }
 
+export function verifyMerkleProof(
+  leaf: string,
+  proof: MerkleProof,
+  rootHashHex: string
+): boolean {
+  if (!proof || !rootHashHex) return false;
+
+  let current = hashLeaf(leaf);
+  for (const step of proof.path) {
+    const sibling = Buffer.from(step.siblingHashHex, 'hex');
+    if (step.isRight) {
+      current = hashPair(current, sibling);
+    } else {
+      current = hashPair(sibling, current);
+    }
+  }
+
+  const peaks: Buffer[] = proof.otherPeaksHex.map((hex) => Buffer.from(hex, 'hex'));
+  peaks.splice(proof.peakIdx, 0, current as Buffer);
+
+  let computedRoot: Buffer;
+  if (peaks.length === 1) {
+    computedRoot = peaks[0];
+  } else {
+    computedRoot = crypto.createHash('sha256').update(Buffer.concat(peaks)).digest();
+  }
+
+  return computedRoot.toString('hex') === rootHashHex;
+}
