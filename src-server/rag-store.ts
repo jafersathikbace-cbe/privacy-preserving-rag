@@ -138,3 +138,41 @@ export class RagStore {
       }
 
       const kResult = runKMeans(transformedVectors, Math.min(N_CLUSTERS_MAX, Math.max(1, Math.floor(Math.sqrt(transformedVectors.length)))));
+      this.kMeansResult = kResult;
+      this.clusterChunks.clear();
+
+      const items: ChunkItem[] = chunkDrafts.map((draft, i) => ({
+        ...draft,
+        globalIdx: i,
+        id: sha256(`${draft.source}|${draft.pageStart}|${draft.pageEnd}|${draft.text}`),
+        clusterId: kResult.labels[i] || 0,
+        proof: { path: [], peakIdx: 0, otherPeaksHex: [] },
+        rootHashHex: '',
+        vector: transformedVectors[i],
+      }));
+
+      for (let c = 0; c < kResult.actualNClusters; c++) {
+        const clusterItems = items.filter((item) => item.clusterId === c);
+        if (!clusterItems.length) continue;
+        const { rootHashHex, proofs } = buildMerkleTree(clusterItems.map((x) => x.text));
+        fs.mkdirSync(MERKLE_DIR, { recursive: true });
+        fs.writeFileSync(path.join(MERKLE_DIR, `cluster_${c}_root.txt`), rootHashHex);
+        clusterItems.forEach((item, idx) => { item.proof = proofs[idx]; item.rootHashHex = rootHashHex; });
+        this.clusterChunks.set(c, clusterItems);
+      }
+
+      this.allChunks = items;
+      this.writeState();
+      this.isIndexReady = true;
+      console.log(`[RAG] Ready: ${items.length} chunks across ${files.length} documents.`);
+    } finally {
+      this.indexing = false;
+    }
+  }
+
+  private writeState() {
+    try {
+      fs.mkdirSync(INDEX_DIR, { recursive: true });
+      fs.writeFileSync(INDEX_STATE_FILE, JSON.stringify({ version: 2, documents: this.getUploadedFiles(), chunks: this.allChunks.length, updatedAt: new Date().toISOString() }));
+    } catch {}
+  }
