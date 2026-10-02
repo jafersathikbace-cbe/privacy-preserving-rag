@@ -198,3 +198,50 @@ export default function App() {
 
         <section className="workspace">
           {messages.length === 0 ? (
+            <div className="welcome">
+              <div className="welcome-kicker"><Sparkles size={14} /> VERIFIED DOCUMENT AI</div>
+              <h1>Ask your knowledge base.<br /><span>Get answers you can trace.</span></h1>
+              <p className="welcome-copy">Search across every uploaded document, combine semantic and lexical retrieval, verify evidence with SHA-256 Merkle proofs, and refuse unsupported answers.</p>
+              <div className="metric-grid">
+                <Metric icon={<FileSearch size={17} />} label="Indexed sources" value={stats.documents} />
+                <Metric icon={<Zap size={17} />} label="Searchable chunks" value={stats.chunks.toLocaleString()} />
+                <Metric icon={<LockKeyhole size={17} />} label="Vector protection" value="Masked" />
+                <Metric icon={<ShieldCheck size={17} />} label="Answer policy" value="Fail-closed" />
+              </div>
+              <div className="capability-grid">
+                <Capability icon={<Search />} title="Hybrid retrieval" text="Semantic similarity + exact lexical signals, searched across the full corpus." />
+                <Capability icon={<ShieldCheck />} title="Verified evidence" text="Only chunks that pass their cryptographic integrity proof reach generation." />
+                <Capability icon={<History />} title="Context-aware" text="Conversation history can resolve references without becoming evidence." />
+              </div>
+              {!files.length && <div className="empty-callout"><UploadCloud size={18} /><div><strong>Start with a document</strong><span>PDF, DOCX, TXT and common images up to 25 MB.</span></div><button onClick={() => fileRef.current?.click()}>Upload</button></div>}
+            </div>
+          ) : (
+            <div className="chat-area">
+              <div className="chat-header"><div><div className="eyebrow">ANALYSIS SESSION</div><h2>{sessions.find((s) => s.id === currentSession)?.title || 'Current analysis'}</h2></div><div className="grounding-badge"><CheckCircle2 size={14} /> Grounded mode</div></div>
+              <div className="messages">
+                {messages.map((m, i) => <MessageCard key={i} message={m} onCopy={copy} onFeedback={feedback} expandedCitation={expandedCitation} setExpandedCitation={setExpandedCitation} />)}
+                {busy && <div className="typing"><div className="assistant-avatar"><ShieldCheck size={16} /></div><div className="typing-card"><span /><span /><span /> Searching, verifying and grounding…</div></div>}
+                <div ref={endRef} />
+              </div>
+            </div>
+          )}
+        </section>
+
+        <div className="composer-wrap">
+          <div className="composer">
+            <div className="composer-meta"><span><ShieldCheck size={12} /> Answers restricted to verified documents</span><span>{files.length} sources</span></div>
+            <div className="composer-row">
+              <textarea ref={textareaRef} value={query} disabled={!stats.ready || busy} placeholder={stats.ready ? 'Ask anything about your uploaded documents…' : 'Upload a document to start asking questions…'} rows={1} onChange={(e) => { setQuery(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(120, e.target.scrollHeight)}px`; }} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} />
+              <button className="send-button" onClick={send} disabled={!query.trim() || busy || !stats.ready} title="Send question"><ArrowUp size={18} /></button>
+            </div>
+            <div className="composer-hint"><span>Enter to send</span><span>Shift + Enter for a new line</span><span className="desktop-only">No web search · No unsupported claims</span></div>
+          </div>
+        </div>
+      </main>
+
+      {uploading && <div className="modal-backdrop"><div className="index-modal"><div className="modal-icon"><Activity size={20} /></div><div className="eyebrow">SECURE INDEXING</div><h3>Preparing your knowledge base</h3><p>Documents are being extracted, embedded, privacy-transformed and integrity-verified.</p><div className="progress-track"><div style={{ width: `${((uploadStage + 1) / 4) * 100}%` }} /></div><div className="stage-list">{STAGES.map((stage, i) => <div className={i <= uploadStage ? 'done' : ''} key={stage}><span>{i < uploadStage ? <Check size={12} /> : i === uploadStage ? <Activity size={12} /> : i + 1}</span>{stage}</div>)}</div></div></div>}
+      {toast && <div className="toast"><CheckCircle2 size={15} /> {toast}</div>}
+    </div>
+  );
+}
+
