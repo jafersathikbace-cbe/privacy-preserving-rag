@@ -87,3 +87,54 @@ export class RagStore {
 
   async loadOrBuildIndex() { await this.rebuildIndex(); }
 
+  async rebuildIndex() {
+    if (this.indexing) return;
+    this.indexing = true;
+    this.isIndexReady = false;
+    try {
+      const files = this.getUploadedFiles();
+      if (!files.length) {
+        this.allChunks = []; this.clusterChunks.clear(); this.kMeansResult = null; this.isIndexReady = false; return;
+      }
+
+      const chunkDrafts: Omit<ChunkItem, 'globalIdx' | 'clusterId' | 'proof' | 'rootHashHex' | 'vector' | 'id'>[] = [];
+      for (const filename of files) {
+        const fullPath = path.join(DATA_DIR, filename);
+        const stat = fs.statSync(fullPath);
+        this.fileStats.set(filename, { size: stat.size, mtimeMs: stat.mtimeMs });
+        const doc = await extractDocument(fullPath);
+        const pieces = chunkDocument(doc.pages);
+        for (const piece of pieces) chunkDrafts.push({ text: piece.text, source: filename, pageStart: piece.pageStart, pageEnd: piece.pageEnd });
+      }
+
+      if (!chunkDrafts.length) { this.allChunks = []; this.clusterChunks.clear(); return; }
+
+      fs.mkdirSync(VECTOR_CACHE_DIR, { recursive: true });
+      let dim = EMBEDDING_DIM;
+      this.transform = this.loadTransform(dim);
+      const transformedVectors: Float32Array[] = new Array(chunkDrafts.length);
+      const missing: number[] = [];
+      for (let i = 0; i < chunkDrafts.length; i++) {
+        const cacheFile = path.join(VECTOR_CACHE_DIR, `${sha256(chunkDrafts[i].text)}.json`);
+        try {
+          if (fs.existsSync(cacheFile)) {
+            const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+            if (Array.isArray(cached) && cached.length === this.transform.perm.length) { transformedVectors[i] = new Float32Array(cached); continue; }
+          }
+        } catch {}
+        missing.push(i);
+      }
+      if (missing.length) {
+        const rawEmbeddings = await embedDocuments(missing.map((i) => chunkDrafts[i].text), BATCH_SIZE);
+        dim = rawEmbeddings[0]?.length || EMBEDDING_DIM;
+        if (dim !== this.transform.perm.length) {
+          this.transform = this.loadTransform(dim);
+        }
+        missing.forEach((originalIndex, j) => {
+          const transformed = normalizeVector(applyTransform(rawEmbeddings[j], this.transform!.perm, this.transform!.signs));
+          transformedVectors[originalIndex] = transformed;
+          try { fs.writeFileSync(path.join(VECTOR_CACHE_DIR, `${sha256(chunkDrafts[originalIndex].text)}.json`), JSON.stringify(Array.from(transformed))); } catch {}
+        });
+      }
+
+      const kResult = runKMeans(transformedVectors, Math.min(N_CLUSTERS_MAX, Math.max(1, Math.floor(Math.sqrt(transformedVectors.length)))));
