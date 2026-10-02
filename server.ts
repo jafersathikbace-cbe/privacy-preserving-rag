@@ -63,3 +63,55 @@ app.delete('/delete_file/:filename', async (req, res) => {
   }
 });
 
+app.post('/chat', async (req, res) => {
+  const query = String(req.body?.message || '').trim();
+  const conversationId = String(req.body?.conversation_id || '');
+  const sourceFilter = String(req.body?.source || 'all');
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  const send = (payload: any) => res.write(`${JSON.stringify(payload)}\n`);
+
+  if (!query) { send({ type: 'answer', content: 'Please enter a question.' }); send({ type: 'done', verification: 'not-needed', query_id: '' }); return res.end(); }
+  if (!ragStore.isIndexReady || !ragStore.allChunks.length) { send({ type: 'answer', content: REFUSAL }); send({ type: 'done', verification: 'unavailable', query_id: '' }); return res.end(); }
+
+  let conv = ragStore.conversations.find((c) => c.id === conversationId);
+  if (!conv) {
+    conv = { id: conversationId || crypto.randomUUID(), title: query.slice(0, 48), messages: [], timestamp: new Date().toISOString() };
+    ragStore.conversations.push(conv);
+  }
+
+  try {
+    const recentUser = [...conv.messages].reverse().find((m) => m.role === 'user')?.content || '';
+    const needsContext = /\b(he|she|they|it|this|that|these|those|there|then|same)\b/i.test(query);
+    const retrievalQuery = needsContext && recentUser ? `${query} ${recentUser}` : query;
+    const retrieved = await ragStore.retrieveAndVerify(retrievalQuery, sourceFilter);
+    if (!retrieved.chunks.length) {
+      send({ type: 'answer', content: REFUSAL });
+      send({ type: 'done', verification: 'refused', query_id: '' });
+      return res.end();
+    }
+
+    const citations = retrieved.chunks.map((chunk, i) => ({ id: i + 1, source: retrieved.sources[i], page: retrieved.pages[i], chunk: chunk.slice(0, 240) }));
+    send({ type: 'citations', citations });
+
+    const context = retrieved.chunks.map((chunk, i) => `[${i + 1}] ${retrieved.sources[i]} (${retrieved.pages[i]})\n${chunk}`).join('\n\n');
+    const result = await generateCloudAnswer(query, context, conv.messages);
+    const queryId = crypto.randomUUID();
+    send({ type: 'answer', content: result.answer, verification: result.verification, evidence: result.evidence });
+
+    ragStore.conversationMetadata.push({ query_id: queryId, query, chunks: retrieved.chunks, sources: retrieved.sources, pages: retrieved.pages, answer: result.answer, timestamp: new Date().toISOString(), verification: result.verification });
+    conv.messages.push({ role: 'user', content: query });
+    conv.messages.push({ role: 'assistant', content: result.answer });
+    conv.timestamp = new Date().toISOString();
+    ragStore.saveConversations();
+    send({ type: 'done', verification: result.verification, query_id: queryId });
+  } catch (err: any) {
+    console.error('[Chat]', err);
+    send({ type: 'answer', content: REFUSAL, verification: 'refused' });
+    send({ type: 'done', verification: 'refused', query_id: '' });
+  }
+  res.end();
+});
+
