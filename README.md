@@ -1,66 +1,123 @@
 # NEXUS — Privacy-Preserving RAG
 
+> A document-grounded Retrieval-Augmented Generation (RAG) application focused on protected embeddings, hybrid retrieval, cryptographic integrity verification, and fail-closed answer generation.
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-NEXUS-blue?style=for-the-badge)](https://privacy-preserving-rag.ai.studio/)
+[![GitHub](https://img.shields.io/badge/Source%20Code-GitHub-black?style=for-the-badge&logo=github)](https://github.com/jafersathikbace-cbe/privacy-preserving-rag)
+
+---
+
+## Overview
+
 NEXUS is a document-grounded RAG application designed around **hybrid retrieval, protected embeddings, cryptographic integrity checks, and fail-closed generation**.
 
-## What it does
+The system allows users to upload documents, retrieve relevant evidence, and generate answers grounded in verified document content rather than relying on unsupported model knowledge.
 
-- Uploads PDF, DOCX, TXT and common image documents.
-- Extracts text and keeps source/page metadata where available.
-- Chunks documents with overlap for better retrieval continuity.
-- Creates Gemini semantic embeddings and applies a secret orthogonal permutation/sign transform before storage and retrieval.
-- Combines semantic similarity with lexical/phrase matching across the **entire indexed corpus**.
-- Verifies every retrieved chunk against a SHA-256 Merkle proof before it reaches the answer model.
-- Uses a strict grounded generation pass plus a second factual verification pass.
-- Refuses unsupported answers instead of filling gaps with model knowledge.
-- Supports multiple documents and shows the actual source and page for retrieved evidence.
-- Supports document deletion with automatic re-indexing.
-- Keeps conversation history separate from evidence; history can help resolve references but is never treated as proof.
+The design focuses on reducing unnecessary exposure of stored embedding representations while ensuring that retrieved evidence is integrity-checked before reaching the answer-generation stage.
 
-## Retrieval design
+---
+
+## Key Features
+
+- 📄 Uploads PDF, DOCX, TXT, and common image documents
+- 🔎 Extracts document text with source and page metadata where available
+- ✂️ Splits documents into overlapping chunks for retrieval continuity
+- 🧠 Generates semantic embeddings using Gemini
+- 🔐 Applies an orthogonal permutation/sign transformation to embeddings before storage and retrieval
+- 🔍 Combines semantic similarity with lexical and phrase matching
+- 🌐 Searches the complete indexed corpus during candidate ranking
+- 🌳 Verifies retrieved chunks using SHA-256 Merkle proofs
+- 🛡️ Allows only verified context to reach answer generation
+- ✅ Uses a second factual verification pass
+- 🚫 Refuses unsupported answers instead of filling gaps with model knowledge
+- 📚 Supports multiple documents
+- 📑 Displays source and page information for retrieved evidence
+- 🗑️ Supports document deletion with automatic re-indexing
+- 💬 Keeps conversation history separate from evidence
+- 🔄 Uses conversation history only for reference resolution, never as proof
+
+---
+
+## How It Works
 
 ```text
-Documents
-  -> extraction + page metadata
-  -> overlapping chunks
-  -> Gemini embeddings
-  -> orthogonal masking
-  -> in-memory vector index + Merkle proofs
+                         NEXUS RAG PIPELINE
 
-Question
-  -> Gemini query embedding + same mask
-  -> global semantic scan
-  -> lexical / phrase scoring
-  -> hybrid ranking + source diversity
-  -> Merkle verification
-  -> verified context only
-  -> grounded answer
-  -> second-pass factual verification
-```
+                         DOCUMENT INGESTION
+                                │
+                                ▼
+                    ┌──────────────────────┐
+                    │  Document Extraction │
+                    │ PDF / DOCX / TXT /   │
+                    │ Images               │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Text + Page Metadata │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Overlapping Chunks    │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Gemini Embeddings     │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Orthogonal Masking   │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Vector Index +        │
+                    │ Merkle Proofs         │
+                    └──────────────────────┘
 
-The important design choice is that retrieval is **not restricted to a small set of clusters**. Clustering is still calculated as an index characteristic, but candidate ranking searches the complete corpus so a relevant chunk in another document cannot be hidden by an incorrect coarse cluster selection.
 
-## Configuration
-
-See `.env.example`. `GEMINI_API_KEY` must be supplied as a server-side secret and must never be committed to Git.
-
-## Local development
-
-```bash
-npm install
-npm run dev
-```
-
-Production build:
-
-```bash
-npm run build
-npm start
-```
-
-## Important deployment note
-
-The current implementation stores uploaded documents and the active index on the application's local filesystem. This is suitable for a prototype/demo but **local Cloud Run/container storage is not durable application storage**. For a production multi-instance deployment, move documents/index state to durable storage such as object storage plus a managed vector/index store.
-
-## Security note
-
-Orthogonal masking changes the representation of stored embeddings while preserving cosine/dot-product geometry. It is a privacy-oriented design feature, not a formal guarantee of end-to-end confidentiality. API keys and durable document storage still require appropriate platform controls.
+                           USER QUESTION
+                                │
+                                ▼
+                    ┌──────────────────────┐
+                    │ Gemini Query         │
+                    │ Embedding            │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Same Embedding Mask  │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+              ┌──────────────────────────────────┐
+              │       Hybrid Retrieval           │
+              │                                  │
+              │  • Semantic similarity            │
+              │  • Lexical matching               │
+              │  • Phrase matching                │
+              │  • Source diversity                │
+              └───────────────┬──────────────────┘
+                              │
+                              ▼
+                    ┌──────────────────────┐
+                    │ Merkle Verification  │
+                    └──────────┬───────────┘
+                               │
+                         Verified Only
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Grounded Generation  │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │ Factual Verification │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                         Final Answer
