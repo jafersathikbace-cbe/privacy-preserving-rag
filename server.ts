@@ -123,3 +123,11 @@ app.post('/feedback', (req, res) => { if (!req.body?.query_id) return res.status
 app.delete('/clear', (_req, res) => { ragStore.conversations = []; ragStore.saveConversations(); res.json({ status: 'cleared' }); });
 
 // Multer errors (including the upload-size limit) are returned as JSON so the UI can explain them.
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err) {
+    const message = err.code === 'LIMIT_FILE_SIZE' ? `File exceeds the ${MAX_FILE_MB} MB upload limit.` : (err.message || 'Request failed.');
+    return res.status(400).json({ detail: message });
+  }
+  return res.status(500).json({ detail: 'Unexpected server error.' });
+});
+
