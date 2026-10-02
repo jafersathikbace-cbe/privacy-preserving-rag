@@ -2,8 +2,26 @@
 
 > A document-grounded Retrieval-Augmented Generation (RAG) application focused on protected embeddings, hybrid retrieval, cryptographic integrity verification, and fail-closed answer generation.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-NEXUS-blue?style=for-the-badge)](https://privacy-preserving-rag.ai.studio/)
-[![GitHub](https://img.shields.io/badge/Source%20Code-GitHub-black?style=for-the-badge&logo=github)](https://github.com/jafersathikbace-cbe/privacy-preserving-rag)
+<p align="center">
+  <a href="https://privacy-preserving-rag.ai.studio/">
+    <img src="https://img.shields.io/badge/Live%20Demo-NEXUS-blue?style=for-the-badge" alt="Live Demo">
+  </a>
+  <a href="https://github.com/jafersathikbace-cbe/privacy-preserving-rag">
+    <img src="https://img.shields.io/badge/Source%20Code-GitHub-black?style=for-the-badge&logo=github" alt="GitHub">
+  </a>
+</p>
+
+---
+
+## Application Preview
+
+<p align="center">
+  <img src="./nexus-dashboard.png" alt="NEXUS Privacy-Preserving RAG dashboard" width="100%">
+</p>
+
+<p align="center">
+  <em>NEXUS document intelligence workspace with hybrid retrieval, verified evidence, protected embeddings, and fail-closed answer generation.</em>
+</p>
 
 ---
 
@@ -59,12 +77,12 @@ The design focuses on reducing unnecessary exposure of stored embedding represen
                                │
                                ▼
                     ┌──────────────────────┐
-                    │ Overlapping Chunks    │
+                    │ Overlapping Chunks   │
                     └──────────┬───────────┘
                                │
                                ▼
                     ┌──────────────────────┐
-                    │ Gemini Embeddings     │
+                    │ Gemini Embeddings    │
                     └──────────┬───────────┘
                                │
                                ▼
@@ -74,8 +92,8 @@ The design focuses on reducing unnecessary exposure of stored embedding represen
                                │
                                ▼
                     ┌──────────────────────┐
-                    │ Vector Index +        │
-                    │ Merkle Proofs         │
+                    │ Vector Index +       │
+                    │ Merkle Proofs        │
                     └──────────────────────┘
 
 
@@ -96,10 +114,10 @@ The design focuses on reducing unnecessary exposure of stored embedding represen
               ┌──────────────────────────────────┐
               │       Hybrid Retrieval           │
               │                                  │
-              │  • Semantic similarity            │
-              │  • Lexical matching               │
-              │  • Phrase matching                │
-              │  • Source diversity                │
+              │  • Semantic similarity           │
+              │  • Lexical matching              │
+              │  • Phrase matching               │
+              │  • Source diversity              │
               └───────────────┬──────────────────┘
                               │
                               ▼
